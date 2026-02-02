@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>3D Bichromatic Classification Visualizer</title>
+		<link rel="stylesheet" href="stylesheet.css" />
+	</head>
+	<body>
+		<div class="app">
+			<header class="app__header">
+				<div>
+					<h1>3D Bichromatic Classification Visualizer</h1>
+				</div>
+			</header>
+
+			<main class="app__main">
+				<aside class="panel">
+					<section class="panel__section">
+						<h2>Data Controls</h2>
+						<label class="control">
+							<span>Separability</span>
+							<input id="separability" type="range" min="0" max="3" step="0.05" />
+							<span id="separabilityValue" class="value">1.5</span>
+						</label>
+						<label class="control">
+							<span>Red Spread</span>
+							<input id="redSpread" type="range" min="0.4" max="2.2" step="0.05" />
+							<span id="redSpreadValue" class="value">1.0</span>
+						</label>
+						<label class="control">
+							<span>Blue Spread</span>
+							<input id="blueSpread" type="range" min="0.4" max="2.2" step="0.05" />
+							<span id="blueSpreadValue" class="value">1.0</span>
+						</label>
+						<label class="control">
+							<span>Points per Class</span>
+							<input id="pointsPerClass" type="number" min="30" max="400" step="10" />
+						</label>
+						<label class="control">
+							<span>Seed</span>
+							<input id="seed" type="number" min="1" max="9999" step="1" />
+						</label>
+						<label class="control control--checkbox">
+							<input id="blueCluster" type="checkbox" />
+							<span>Two blue clusters</span>
+						</label>
+						<label class="control" data-blue-cluster>
+							<span>Cluster Offset</span>
+							<input id="blueClusterOffset" type="range" min="0" max="3" step="0.05" />
+							<span id="blueClusterOffsetValue" class="value">0.8</span>
+						</label>
+						<div class="control-group">
+							<span class="control-group__title">Red mean shift</span>
+							<label class="control">
+								<span>X</span>
+								<input id="redShiftX" type="range" min="-2" max="2" step="0.05" />
+								<span id="redShiftXValue" class="value">0.00</span>
+							</label>
+							<label class="control">
+								<span>Y</span>
+								<input id="redShiftY" type="range" min="-2" max="2" step="0.05" />
+								<span id="redShiftYValue" class="value">0.00</span>
+							</label>
+							<label class="control">
+								<span>Z</span>
+								<input id="redShiftZ" type="range" min="-2" max="2" step="0.05" />
+								<span id="redShiftZValue" class="value">0.00</span>
+							</label>
+						</div>
+						<div class="control-group">
+							<span class="control-group__title">Blue mean shift</span>
+							<label class="control">
+								<span>X</span>
+								<input id="blueShiftX" type="range" min="-2" max="2" step="0.05" />
+								<span id="blueShiftXValue" class="value">0.00</span>
+							</label>
+							<label class="control">
+								<span>Y</span>
+								<input id="blueShiftY" type="range" min="-2" max="2" step="0.05" />
+								<span id="blueShiftYValue" class="value">0.00</span>
+							</label>
+							<label class="control">
+								<span>Z</span>
+								<input id="blueShiftZ" type="range" min="-2" max="2" step="0.05" />
+								<span id="blueShiftZValue" class="value">0.00</span>
+							</label>
+						</div>
+					</section>
+
+					<section class="panel__section">
+						<h2>Classifier (Paper)</h2>
+						<label class="control">
+							<span>Region Type</span>
+							<select id="classifierType">
+								<option value="halfplane">Halfplane</option>
+								<option value="slice">Slice (Parallel Planes)</option>
+								<option value="wedge">Wedge</option>
+								<option value="diwedge">Diwedge</option>
+							</select>
+						</label>
+						<label class="control">
+							<span>Solver Mode</span>
+							<select id="solverMode">
+								<option value="heuristic">Heuristic (fast)</option>
+								<option value="exact">Exact</option>
+							</select>
+						</label>
+						<label class="control">
+							<span>Outlier Objective</span>
+							<select id="outlierObjective">
+								<option value="minRed">Minimize Red Outliers (kR, kB = 0)</option>
+								<option value="minBlue">Minimize Blue Outliers (kB, kR = 0)</option>
+								<option value="minTotal">Minimize Total Outliers (k)</option>
+							</select>
+						</label>
+					</section>
+				</aside>
+
+				<section class="viz">
+					<canvas id="plot" width="900" height="650"></canvas>
+					<div class="viz__legend">
+						<div><span class="dot dot--class0"></span> Red points</div>
+						<div><span class="dot dot--class1"></span> Blue points</div>
+					</div>
+					<div id="metrics" class="viz__metrics"></div>
+				</section>
+			</main>
+		</div>
+
+		<script src="index.js"></script>
+	</body>
+</html>
