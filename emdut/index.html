@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMDuT - FFT Cross-Correlation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>EMDuT <span>Visualizer</span></h1>
+            </div>
+            <p class="subtitle">Earth Mover's Distance under Translation via Fast Fourier Transform & Kernel Density</p>
+        </header>
+
+        <main class="dashboard">
+            <div class="visualizers">
+                <!-- Panel 1: Input Point Clouds -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>1. Discrete Point Clouds</h2>
+                        <span class="badge">Input Space</span>
+                    </div>
+                    <p class="desc">Two sets of points, <strong>A (Blue)</strong> and <strong>B (Orange)</strong>. Finding the exact optimal translation for EMD is computationally heavy.</p>
+                    <div class="canvas-container">
+                        <canvas id="canvas-points" width="400" height="400"></canvas>
+                        <div class="overlay-text" id="pts-overlay">Drag the Blue points!</div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Kernel Density Estimation -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>2. Kernel Density Estimation</h2>
+                        <span class="badge">Continuous</span>
+                    </div>
+                    <p class="desc">We approximate the points as continuous 2D distributions by applying a Gaussian blur (rasterization).</p>
+                    <div class="canvas-container">
+                        <canvas id="canvas-kde" width="400" height="400"></canvas>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <aside class="controls">
+                <div class="control-card">
+                    <h3>Experiment Controls</h3>
+                    <div class="button-group">
+                        <select id="mode-select" class="btn secondary" style="width: 100%; margin-bottom: 0.5rem; background: var(--panel-bg); color: var(--text-primary); border: 1px solid var(--border-color);">
+                            <option value="symmetric">Symmetric (Equal Sizes)</option>
+                            <option value="asymmetric">Asymmetric (Partial Matching)</option>
+                        </select>
+                        <button id="btn-generate" class="btn primary">Generate New Sets</button>
+                        <button id="btn-snap" class="btn secondary">Snap to Peak Translation</button>
+                    </div>
+                    
+                    <div class="slider-group">
+                        <label for="blur-radius">Gaussian Blur Radius (σ)</label>
+                        <input type="range" id="blur-radius" min="5" max="40" value="15">
+                        <span class="value-display" id="blur-val">15px</span>
+                    </div>
+
+                    <div class="slider-group" style="margin-top: 1rem;">
+                        <label for="num-points">Number of Points (Set A)</label>
+                        <input type="range" id="num-points" min="1" max="20" value="3">
+                        <span class="value-display" id="num-val">3</span>
+                    </div>
+
+                    <div class="slider-group" style="flex-direction: row; align-items: center; justify-content: space-between; margin-top: 1.5rem; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+                        <label for="overlay-toggle" style="color: #10b981; font-weight: bold;">Overlay Target Heatmap</label>
+                        <input type="checkbox" id="overlay-toggle" checked style="width: 20px; height: 20px; accent-color: #10b981; cursor: pointer;">
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>How it Works</h3>
+                    <ul>
+                        <li><strong>The Problem:</strong> Exact EMD under translation requires an expensive grid search.</li>
+                        <li><strong>The Approximation:</strong> We convert discrete points into blurred images.</li>
+                        <li><strong>The FFT Magic:</strong> Using the Convolution Theorem, we compute the overlap of these images across <em>all</em> translations at once.</li>
+                        <li><strong>The Result:</strong> The brightest pixel in the Cross-Correlation map indicates the $\Delta x, \Delta y$ that optimally aligns the sets.</li>
+                    </ul>
+                </div>
+            </aside>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
