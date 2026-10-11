@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Similarity FPTAS Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: control strip, then two square plots (point space | c-plane) beside a numbered step rail with the live explanation */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --fg: #17202c;
+  --muted: #5d6878;
+  --line: #d6dce5;
+  --pt-a: #0b7c87;
+  --pt-b: #bf3768;
+  --accent: #b5760a;
+  --accent-soft: #f5e6c6;
+  --ok: #2d7a48;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #161d27; --fg: #e3e8ef; --muted: #98a4b5; --line: #2b3543;
+    --pt-a: #3fc2cb; --pt-b: #f27ca5; --accent: #f0b443; --accent-soft: #3b3019; --ok: #62c788;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #161d27; --fg: #e3e8ef; --muted: #98a4b5; --line: #2b3543;
+  --pt-a: #3fc2cb; --pt-b: #f27ca5; --accent: #f0b443; --accent-soft: #3b3019; --ok: #62c788;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 20px 40px;
+}
+.wrap { max-width: 1320px; margin-inline: auto; display: grid; gap: 18px; }
+header { display: grid; gap: 4px; }
+h1 {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 3.2vw, 36px);
+  letter-spacing: -0.01em; line-height: 1.1; margin: 0; text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); max-width: 72ch; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Controls */
+.controls {
+  display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+}
+.ctl { display: grid; gap: 4px; min-width: 0; }
+.ctl label, .ctl .lbl {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+}
+.ctl .row { display: flex; align-items: center; gap: 8px; }
+.ctl input[type="range"] { width: 120px; accent-color: var(--accent); }
+.ctl output { font-family: var(--font-mono); font-size: 13px; min-width: 3.5ch; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  padding: 6px 12px; cursor: pointer; font-size: 13px; text-transform: none; letter-spacing: 0;
+  font-weight: 500; color: var(--fg); border-right: 1px solid var(--line);
+}
+.seg label:last-of-type { border-right: 0; }
+.seg input:checked + label { background: var(--fg); color: var(--surface); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -2px; }
+select, .btn, input[type="number"] {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px;
+}
+input[type="number"] { width: 6.5ch; font-family: var(--font-mono); }
+.btn { cursor: pointer; font-weight: 500; }
+.btn:hover:not(:disabled) { border-color: var(--fg); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Main layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+.plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.fighead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fighead h2 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
+.fighead .tools { display: flex; gap: 6px; }
+.fighead .tools .btn { padding: 3px 8px; font-size: 12px; }
+canvas { width: 100%; aspect-ratio: 1 / 1; display: block; border-radius: 6px; max-width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin: 0; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex: none; }
+.sw.a { background: var(--pt-a); }
+.sw.b { border: 2px solid var(--pt-b); }
+.sw.tb { background: var(--pt-b); }
+.sw.acc { background: var(--accent); border-radius: 2px; }
+.sw.plant { border: 2px solid var(--ok); }
+.sw.cen { background: var(--muted); width: 7px; height: 7px; }
+
+/* Side: step rail + explanation */
+.side { display: grid; gap: 14px; min-width: 0; }
+.rail { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.rail button {
+  width: 100%; display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; text-align: left;
+  font: inherit; color: var(--fg); background: transparent; border: 0; border-radius: 7px; padding: 7px 8px; cursor: pointer;
+}
+.rail button:disabled { cursor: default; color: var(--muted); }
+.rail .no {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line);
+}
+.rail .tag { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.rail li.done .no { background: var(--line); }
+.rail li.cur button { background: var(--accent-soft); }
+.rail li.cur .no { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.transport { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.progress { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s linear; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.panel h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; margin: 0; text-wrap: balance; }
+.panel .eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.panel p { margin: 0; }
+.stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.panel .now { background: var(--accent-soft); border-radius: 7px; padding: 8px 10px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.note { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+.levels { width: 100%; border-collapse: collapse; font-size: 12.5px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.levels th { font-family: var(--font-body); font-weight: 600; color: var(--muted); text-align: right; font-size: 11px; }
+.levels td, .levels th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+.levels td:first-child, .levels th:first-child { text-align: left; }
+.levels .stop { color: var(--accent); font-weight: 500; }
+.tablewrap { overflow-x: auto; }
+
+@media (max-width: 1080px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .plots { grid-template-columns: minmax(0, 1fr); }
+  .ctl input[type="range"] { width: 100px; }
+}
+@media (prefers-reduced-motion: reduce) { .progress span { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Similarity FPTAS Walkthrough</h1>
+    <p class="lede">Step through the (1+ε)-approximation for the Earth Mover's Distance under rotation, scaling and translation in the plane. Every number below is computed live in your browser on the instance shown.</p>
+  </header>
+
+  <section class="controls" aria-label="Instance and algorithm settings">
+    <div class="ctl">
+      <span class="lbl" id="alg-lbl">Algorithm</span>
+      <div class="seg" role="radiogroup" aria-labelledby="alg-lbl">
+        <input type="radio" name="alg" id="alg-a" value="a" checked><label for="alg-a">(a) all anchors</label>
+        <input type="radio" name="alg" id="alg-b" value="b"><label for="alg-b">(b) sampled</label>
+        <input type="radio" name="alg" id="alg-c" value="c"><label for="alg-c">(c) annulus</label>
+      </div>
+    </div>
+    <div class="ctl"><label for="in-n">Points per set</label><div class="row"><input type="range" id="in-n" min="4" max="12" step="1" value="8"><output id="out-n">8</output></div></div>
+    <div class="ctl"><label for="in-noise">Noise</label><div class="row"><input type="range" id="in-noise" min="0" max="0.3" step="0.01" value="0.06"><output id="out-noise">0.06</output></div></div>
+    <div class="ctl"><label for="in-twist">Planted rotation</label><div class="row"><input type="range" id="in-twist" min="-180" max="180" step="5" value="65"><output id="out-twist">65°</output></div></div>
+    <div class="ctl"><label for="in-scale">Planted scale</label><div class="row"><input type="range" id="in-scale" min="0.5" max="2.5" step="0.1" value="1.4"><output id="out-scale">1.4</output></div></div>
+    <div class="ctl"><label for="in-eps">ε for the guarantee</label><div class="row"><input type="range" id="in-eps" min="0.1" max="1" step="0.05" value="0.5"><output id="out-eps">0.5</output></div></div>
+    <div class="ctl"><label for="in-k">Demo grid detail</label><div class="row"><input type="range" id="in-k" min="3" max="8" step="1" value="5"><output id="out-k">5</output></div></div>
+    <div class="ctl"><label for="in-seed">Seed</label><div class="row"><input type="number" id="in-seed" min="1" value="7"><button class="btn" id="btn-new" type="button">New instance</button></div></div>
+    <div class="ctl"><label for="in-speed">Speed</label><select id="in-speed"><option value="step">Step (pause per centre / level)</option><option value="slow" selected>Slow</option><option value="watch">Watch</option><option value="fast">Fast</option></select></div>
+  </section>
+
+  <div class="layout">
+    <div class="plots">
+      <figure>
+        <div class="fighead"><h2>Point space</h2><span class="mono" id="pt-caption" style="font-size:12px;color:var(--muted)"></span></div>
+        <canvas id="cv-points" aria-label="Point sets A and B with the current candidate alignment"></canvas>
+        <ul class="legend">
+          <li><span class="sw a"></span>A</li>
+          <li><span class="sw b"></span>B</li>
+          <li><span class="sw tb"></span>T(B), current candidate</li>
+          <li><span class="sw cen"></span>transport plan</li>
+        </ul>
+      </figure>
+      <figure>
+        <div class="fighead"><h2>Parameter plane, c ∈ ℂ</h2>
+          <div class="tools"><button class="btn" type="button" id="btn-fit">Whole plane</button><button class="btn" type="button" id="btn-zoom">Zoom on best</button></div>
+        </div>
+        <canvas id="cv-plane" aria-label="The complex parameter c = scale times rotation, with candidate centres and grids"></canvas>
+        <ul class="legend">
+          <li><span class="sw cen"></span>anchor centre aᵢ/bⱼ</li>
+          <li><span class="sw acc"></span>grid / best c</li>
+          <li><span class="sw plant"></span>planted c (hidden)</li>
+        </ul>
+      </figure>
+    </div>
+
+    <aside class="side">
+      <ol class="rail" id="rail"></ol>
+      <div class="transport">
+        <button class="btn" type="button" id="btn-prev">← Back</button>
+        <button class="btn primary" type="button" id="btn-next">Next step →</button>
+        <button class="btn" type="button" id="btn-play">Play all</button>
+        <button class="btn" type="button" id="btn-finish" hidden>Finish step</button>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="prog"></span></div>
+      <article class="panel" id="panel" aria-live="polite"></article>
+    </aside>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ─────────────────────────── settings ───────────────────────────
+const ctl = { alg: "a", n: 8, noise: 0.06, twist: 65, scale: 1.4, eps: 0.5, K: 5, seed: 7, speed: "slow" };
+const SAMPLES = 4;          // k = ⌈log2(1/η)⌉ with η = 1/16 for algorithm (b)
+const EVAL_CAP = 1500000;   // safety budget for the demo
+const STEPS = {
+  a: ["input", "centre", "anchors", "coarse", "fine", "result"],
+  b: ["input", "centre", "sample", "coarse", "fine", "result"],
+  c: ["input", "centre", "annulus", "halving", "result"]
+};
+const STEP_INFO = {
+  input:   { title: "Input", tag: "problem" },
+  centre:  { title: "Centre both sets", tag: "L1" },
+  anchors: { title: "Anchor centres aᵢ/bⱼ", tag: "L4" },
+  sample:  { title: "Sample anchors", tag: "Markov" },
+  coarse:  { title: "Coarse value Π̃", tag: "L3 + L4" },
+  fine:    { title: "Fine grids", tag: "L3" },
+  annulus: { title: "Scale annulus", tag: "L2" },
+  halving: { title: "Halving search", tag: "stop rule" },
+  result:  { title: "Result", tag: "1+ε" }
+};
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ─────────────────────────── utilities ───────────────────────────
+const $ = s => document.querySelector(s);
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function fmt(x, d = 3) {
+  if (x === null || x === undefined || !isFinite(x)) return "—";
+  if (x === 0) return "0";
+  const a = Math.abs(x);
+  if (a >= 1e5 || a < 1e-3) return x.toExponential(2);
+  return Number(x.toPrecision(d)).toString();
+}
+function big(x) {
+  if (!isFinite(x)) return "—";
+  if (x < 1e6) return Math.round(x).toLocaleString("en-US");
+  const e = Math.floor(Math.log10(x)), m = x / 10 ** e;
+  return `${m.toFixed(1)} × 10<sup>${e}</sup>`;
+}
+const deg = (re, im) => Math.atan2(im, re) * 180 / Math.PI;
+const cabs = (re, im) => Math.hypot(re, im);
+function cfmt(re, im) { return `|c| ${fmt(cabs(re, im))}, ${fmt(deg(re, im), 3)}°`; }
+
+// ─────────────────────────── exact EMD oracle (Hungarian) ───────────────────────────
+// Equal sizes and uniform weights 1/n: EMD = (min-cost perfect matching) / n.
+const MAXN = 13;
+const COST = new Float64Array(MAXN * MAXN);
+const hu = new Float64Array(MAXN), hv = new Float64Array(MAXN), minv = new Float64Array(MAXN);
+const hp = new Int32Array(MAXN), way = new Int32Array(MAXN), used = new Uint8Array(MAXN);
+function hungarian(n) {
+  hu.fill(0); hv.fill(0); hp.fill(0); way.fill(0);
+  for (let i = 1; i <= n; i++) {
+    hp[0] = i; let j0 = 0;
+    minv.fill(Infinity); used.fill(0);
+    do {
+      used[j0] = 1;
+      const i0 = hp[j0]; let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= n; j++) {
+        if (used[j]) continue;
+        const cur = COST[(i0 - 1) * n + (j - 1)] - hu[i0] - hv[j];
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+      }
+      for (let j = 0; j <= n; j++) {
+        if (used[j]) { hu[hp[j]] += delta; hv[j] -= delta; } else minv[j] -= delta;
+      }
+      j0 = j1;
+    } while (hp[j0] !== 0);
+    do { const j1 = way[j0]; hp[j0] = hp[j1]; j0 = j1; } while (j0);
+  }
+  let total = 0;
+  for (let j = 1; j <= n; j++) total += COST[(hp[j] - 1) * n + (j - 1)];
+  return total;
+}
+function fillCost(R, cr, ci, tx, ty) {
+  const n = R.n, A = R.A, B = R.B;
+  for (let j = 0; j < n; j++) {
+    const bx = cr * B[j][0] - ci * B[j][1] + tx, by = cr * B[j][1] + ci * B[j][0] + ty;
+    for (let i = 0; i < n; i++) {
+      const dx = A[i][0] - bx, dy = A[i][1] - by;
+      COST[i * n + j] = Math.sqrt(dx * dx + dy * dy);
+    }
+  }
+}
+function evalCT(R, cr, ci, tx, ty) {        // one oracle call
+  R.evals++;
+  fillCost(R, cr, ci, tx, ty);
+  return hungarian(R.n) / R.n;
+}
+function planCT(R, cr, ci, tx, ty) {        // for drawing only, not counted
+  fillCost(R, cr, ci, tx, ty);
+  const v = hungarian(R.n) / R.n, pairs = [];
+  for (let j = 1; j <= R.n; j++) pairs.push([hp[j] - 1, j - 1]);
+  return { v, pairs };
+}
+
+// ─────────────────────────── instance ───────────────────────────
+function makeInstance() {
+  const rnd = mulberry32(ctl.seed * 7919 + 13);
+  const gauss = () => { let u = 0; while (u === 0) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); };
+  const n = ctl.n;
+  const k = 2 + Math.floor(rnd() * 2);
+  const cl = [];
+  for (let q = 0; q < k; q++) cl.push({ x: (rnd() * 2 - 1) * 0.9, y: (rnd() * 2 - 1) * 0.9, sx: 0.18 + rnd() * 0.3, sy: 0.06 + rnd() * 0.12, r: rnd() * Math.PI });
+  const Braw = [];
+  for (let i = 0; i < n; i++) {
+    const c = cl[i % k], gx = gauss() * c.sx, gy = gauss() * c.sy;
+    Braw.push([c.x + gx * Math.cos(c.r) - gy * Math.sin(c.r) - 1.7, c.y + gx * Math.sin(c.r) + gy * Math.cos(c.r) - 0.5]);
+  }
+  const th = ctl.twist * Math.PI / 180, cr = ctl.scale * Math.cos(th), ci = ctl.scale * Math.sin(th);
+  const tt = [1.0 + rnd() * 0.6, 0.9 + rnd() * 0.5];
+  const mB = Braw.reduce((s, p) => [s[0] + p[0] / n, s[1] + p[1] / n], [0, 0]);
+  const MBraw = Braw.reduce((s, p) => s + Math.hypot(p[0] - mB[0], p[1] - mB[1]), 0) / n;
+  const sigma = ctl.noise * MBraw * ctl.scale;
+  let Araw = Braw.map(p => [cr * p[0] - ci * p[1] + tt[0] + gauss() * sigma, cr * p[1] + ci * p[0] + tt[1] + gauss() * sigma]);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [Araw[i], Araw[j]] = [Araw[j], Araw[i]]; }
+
+  const mean = P => P.reduce((s, p) => [s[0] + p[0] / n, s[1] + p[1] / n], [0, 0]);
+  const muA = mean(Araw), muB = mean(Braw);
+  const A = Araw.map(p => [p[0] - muA[0], p[1] - muA[1]]);
+  const B = Braw.map(p => [p[0] - muB[0], p[1] - muB[1]]);
+  const MA = A.reduce((s, p) => s + Math.hypot(p[0], p[1]), 0) / n;
+  const MB = B.reduce((s, p) => s + Math.hypot(p[0], p[1]), 0) / n;
+  // planted map in centred coordinates: z ↦ c z + t', t' = c μB + t − μA
+  const tp = [cr * muB[0] - ci * muB[1] + tt[0] - muA[0], cr * muB[1] + ci * muB[0] + tt[1] - muA[1]];
+
+  // fixed point-space view covering raw and centred positions
+  let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+  for (const p of [...Araw, ...Braw, ...A, ...B]) { lo = [Math.min(lo[0], p[0]), Math.min(lo[1], p[1])]; hi = [Math.max(hi[0], p[0]), Math.max(hi[1], p[1])]; }
+  const view = { cx: (lo[0] + hi[0]) / 2, cy: (lo[1] + hi[1]) / 2, r: 0.56 * Math.max(hi[0] - lo[0], hi[1] - lo[1]) + 0.15 };
+
+  const R = { n, Araw, Braw, A, B, muA, muB, MA, MB, cPl: [cr, ci], tPl: tp, sigma, view, evals: 0, anim: 0 };
+  R.vPl = planCT(R, cr, ci, tp[0], tp[1]).v;
+  return R;
+}
+
+// ─────────────────────────── step logic ───────────────────────────
+let base = null, res = null, snapshots = [], stepIdx = 0, job = null, playing = false, playTimer = null, planeZoom = false;
+const keys = () => STEPS[ctl.alg];
+const stepKey = () => keys()[stepIdx];
+
+function pairsFor(R, js) {
+  const out = [];
+  for (const j of js) {
+    const [bx, by] = R.B[j], d = bx * bx + by * by;
+    if (d < 1e-18) continue;
+    for (let i = 0; i < R.n; i++) {
+      const [ax, ay] = R.A[i];
+      out.push({ i, j, zr: (ax * bx + ay * by) / d, zi: (ay * bx - ax * by) / d });
+    }
+  }
+  return out;
+}
+
+const ENTER = {
+  input() { return null; },
+  centre() {
+    return (function* () {
+      if (reduceMotion) { res.anim = 1; return; }
+      for (let f = 1; f <= 40; f++) { res.anim = f / 40; yield; }
+    })();
+  },
+  anchors() {
+    const R = res;
+    R.far = R.B.map(b => Math.hypot(b[0], b[1]) >= R.MB / 2);
+    R.centres = pairsFor(R, R.B.map((_, j) => j));
+    return null;
+  },
+  sample() {
+    const R = res, rnd = mulberry32(ctl.seed * 31 + 5);
+    R.far = R.B.map(b => Math.hypot(b[0], b[1]) >= R.MB / 2);
+    const J = R.B.map((b, j) => j).filter(j => R.far[j]);
+    const w = J.map(j => Math.hypot(R.B[j][0], R.B[j][1])), W = w.reduce((s, x) => s + x, 0);
+    R.draws = [];
+    for (let s = 0; s < SAMPLES; s++) {
+      let u = rnd() * W, pick = J[J.length - 1];
+      for (let q = 0; q < J.length; q++) { u -= w[q]; if (u <= 0) { pick = J[q]; break; } }
+      R.draws.push(pick);
+    }
+    R.samples = [...new Set(R.draws)];
+    R.centres = pairsFor(R, R.samples);
+    return null;
+  },
+  coarse() {
+    return (function* () {
+      const R = res; R.coarse = []; R.coarseBest = null;
+      for (const pr of R.centres) {
+        const v = evalCT(R, pr.zr, pr.zi, 0, 0);
+        const e = { ...pr, v }; R.coarse.push(e);
+        if (!R.coarseBest || v < R.coarseBest.v) R.coarseBest = e;
+        R.Pi = R.coarseBest.v;
+        yield;
+      }
+      R.best = { cr: R.coarseBest.zr, ci: R.coarseBest.zi, tx: 0, ty: 0, v: R.coarseBest.v };
+    })();
+  },
+  fine() {
+    return (function* () {
+      const R = res, lam = ctl.alg === "b" ? 6 : 4, K = ctl.K, Kt = 2;
+      const Rc = lam * R.Pi / R.MB, Rt = R.Pi, hc = Rc / (K - 0.5), ht = Rt / (Kt - 0.5);
+      R.fine = { lam, Rc, Rt, hc, ht, K, Kt, done: 0, total: R.coarse.length, cur: null, pts: [], visited: [] };
+      R.unitTotal = (2 * K + 1) ** 2;   // c-points per centre, used for pacing
+      const order = R.coarse.slice().sort((a, b) => a.v - b.v);
+      for (const cen of order) {
+        R.fine.cur = { zr: cen.zr, zi: cen.zi, v: cen.v, i: cen.i, j: cen.j }; R.fine.pts = [];
+        R.fine.bestBefore = R.best.v;
+        for (let gx = -K; gx <= K; gx++) {
+          for (let gy = -K; gy <= K; gy++) {
+            const cr = cen.zr + gx * hc, ci = cen.zi + gy * hc;
+            let bv = Infinity;
+            for (let sx = -Kt; sx <= Kt; sx++) for (let sy = -Kt; sy <= Kt; sy++) {
+              const tx = sx * ht, ty = sy * ht, v = evalCT(R, cr, ci, tx, ty);
+              if (v < bv) bv = v;
+              if (v < R.best.v) R.best = { cr, ci, tx, ty, v };
+            }
+            R.fine.pts.push([cr, ci, bv]);
+            yield;
+          }
+        }
+        R.fine.visited.push([cen.zr, cen.zi]);
+        R.fine.done++;
+        yield "unit";   // one centre finished: Step mode pauses here
+      }
+      R.fine.cur = null; R.fine.pts = [];
+    })();
+  },
+  annulus() {
+    const R = res;
+    R.best = { cr: 0, ci: 0, tx: 0, ty: 0, v: evalCT(R, 0, 0, 0, 0) };
+    R.levels = [];
+    return null;
+  },
+  halving() {
+    return (function* () {
+      const R = res, g = ctl.K / 2, Kt = 1;
+      R.levels = [];
+      for (let l = 0; l < 40; l++) {
+        const P = R.MA / 2 ** l, h = P / (g * R.MB), ht = P / (Kt - 0.5);
+        const kLo = Math.max(0, Math.floor((R.MA - 2 * P) / (h * R.MB))), kHi = Math.ceil((R.MA + 2 * P) / (h * R.MB));
+        if (R.levels.length) R.levels[R.levels.length - 1].pts = null;
+        let total = 0;
+        for (let k = kLo; k <= kHi; k++) total += k === 0 ? 1 : Math.ceil(2 * Math.PI * k);
+        const lev = { l, P, h, kLo, kHi, total, count: 0, V: null, stop: false, pts: [] };
+        R.levels.push(lev);
+        R.unitTotal = total;   // c-points in this level, used for pacing
+        for (let k = kLo; k <= kHi; k++) {
+          const r = k * h, m = k === 0 ? 1 : Math.ceil(2 * Math.PI * k);
+          for (let q = 0; q < m; q++) {
+            const a = 2 * Math.PI * q / m, cr = r * Math.cos(a), ci = r * Math.sin(a);
+            let bv = Infinity;
+            for (let sx = -Kt; sx <= Kt; sx++) for (let sy = -Kt; sy <= Kt; sy++) {
+              const tx = sx * ht, ty = sy * ht, v = evalCT(R, cr, ci, tx, ty);
+              lev.count++;
+              if (v < bv) bv = v;
+              if (v < R.best.v) R.best = { cr, ci, tx, ty, v };
+            }
+            lev.pts.push([cr, ci, bv]);
+            if (R.evals > EVAL_CAP) { lev.capped = true; lev.V = R.best.v; return; }
+            yield;
+          }
+        }
+        lev.V = R.best.v;
+        lev.stop = lev.V > P;
+        yield "unit";   // one level finished (rule checked): Step mode pauses here
+        if (lev.stop) break;
+        if (R.evals > EVAL_CAP) { lev.capped = true; break; }
+      }
+    })();
+  },
+  result() {
+    return (function* () {
+      const R = res;
+      // reference value: local pattern search from the output and from the planted map
+      const polish = function* (start) {
+        let { cr, ci, tx, ty, v } = start;
+        let sc = 0.05 * R.MA / R.MB, st = 0.05 * R.MA;
+        for (let it = 0; it < 400 && sc > 1e-7 * R.MA / R.MB; it++) {
+          let improved = false;
+          const moves = [[sc, 0, 0, 0], [-sc, 0, 0, 0], [0, sc, 0, 0], [0, -sc, 0, 0], [0, 0, st, 0], [0, 0, -st, 0], [0, 0, 0, st], [0, 0, 0, -st]];
+          for (const [a, b, c, d] of moves) {
+            fillCost(R, cr + a, ci + b, tx + c, ty + d);
+            const w = hungarian(R.n) / R.n;
+            if (w < v - 1e-15) { cr += a; ci += b; tx += c; ty += d; v = w; improved = true; }
+          }
+          if (!improved) { sc /= 2; st /= 2; }
+          if (it % 4 === 3) yield;
+        }
+        return { cr, ci, tx, ty, v };
+      };
+      const p1 = yield* polish(R.best);
+      const p2 = yield* polish({ cr: R.cPl[0], ci: R.cPl[1], tx: R.tPl[0], ty: R.tPl[1], v: R.vPl });
+      R.ref = Math.min(p1.v, p2.v, R.best.v);
+      R.refAt = p1.v <= p2.v ? p1 : p2;
+    })();
+  }
+};
+
+function resetAll() {
+  stopPlay();
+  job = null;
+  base = makeInstance();
+  snapshots = [];
+  planeZoom = false;
+  enterStep(0);
+}
+function enterStep(i) {
+  job = null;
+  stepIdx = i;
+  if (snapshots[i]) { res = structuredClone(snapshots[i]); render(); afterStep(); return; }
+  res = structuredClone(i === 0 ? base : snapshots[i - 1]);
+  const gen = ENTER[keys()[i]]();
+  if (gen) { job = { gen, key: keys()[i] }; pump(); }   // first chunk runs now, so the step's state exists before any render
+  else { snapshots[i] = structuredClone(res); render(); afterStep(); }
+}
+// Pacing. Fine grids and the halving search are paced per unit (one centre, one level):
+// seconds per unit for each speed. "step" animates each unit at the watch pace, then pauses.
+const FRAME = 16;
+const PACE = { slow: { fine: 2.5, halving: 5 }, watch: { fine: 0.5, halving: 1.5 } };
+const TICKS = { slow: { centre: 1, coarse: 1 }, watch: { centre: 1, coarse: 2 } };
+function tickLimit(key, mode) {
+  const pk = mode === "step" ? "watch" : mode;
+  const sec = (PACE[pk] || {})[key];
+  if (sec && res.unitTotal) return Math.max(1, Math.ceil(res.unitTotal / (sec * 1000 / FRAME)));
+  return (TICKS[pk] || {})[key] || Infinity;
+}
+// Timers, not requestAnimationFrame: rAF stalls in IDE previews, hidden tabs and headless browsers.
+function schedule() { setTimeout(pump, ctl.speed === "fast" || (job && job.rush) ? 0 : FRAME); }
+function resume() {
+  if (job && job.paused) { job.paused = false; clearTimeout(playTimer); render(); schedule(); }
+}
+function rushStep() {
+  if (!job) return;
+  job.rush = true;
+  if (job.paused) { job.paused = false; schedule(); }
+}
+function pump() {
+  if (!job || job.paused) return;
+  const my = job, mode = ctl.speed, t0 = performance.now();
+  let ticks = 0, done = false;
+  try {
+    while (true) {
+      const rush = mode === "fast" || my.rush;
+      const r = my.gen.next();
+      if (r.done) { done = true; break; }
+      ticks++;
+      if (r.value === "unit" && !rush) {
+        if (mode === "step") my.paused = true;
+        break;   // let the finished centre or level show before the next one starts
+      }
+      if (!rush && ticks >= tickLimit(my.key, mode)) break;
+      if (performance.now() - t0 > (rush ? 35 : 10)) break;
+    }
+    if (job !== my) return;
+    if (done) { job = null; snapshots[stepIdx] = structuredClone(res); render(); afterStep(); }
+    else if (my.paused) {
+      lastPanel = 0; render();
+      if (playing) playTimer = setTimeout(resume, 900);
+    }
+    else { render(); schedule(); }
+  } catch (err) {
+    if (job === my) job = null;
+    stopPlay(); render();
+    $("#panel").insertAdjacentHTML("beforeend", `<p class="note">This step stopped with an error: ${String(err && err.message || err)}. Change a setting or click New instance to start again.</p>`);
+    console.error(err);
+  }
+}
+function afterStep() {
+  updateButtons();
+  if (playing) {
+    if (stepIdx < keys().length - 1) playTimer = setTimeout(() => enterStep(stepIdx + 1), reduceMotion ? 300 : 1100);
+    else stopPlay();
+  }
+}
+function stopPlay() { playing = false; clearTimeout(playTimer); $("#btn-play").textContent = "Play all"; }
+
+// ─────────────────────────── theme & drawing ───────────────────────────
+const TH = {};
+function hexToRgb(h) {
+  h = h.trim();
+  if (h[0] === "#") {
+    if (h.length === 4) h = "#" + [...h.slice(1)].map(c => c + c).join("");
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+  const m = h.match(/\d+/g);
+  return m ? m.slice(0, 3).map(Number) : [128, 128, 128];
+}
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ["surface", "fg", "muted", "line", "pt-a", "pt-b", "accent", "accent-soft", "ok"]) {
+    TH[k] = cs.getPropertyValue("--" + k).trim();
+    TH[k + "-rgb"] = hexToRgb(TH[k]);
+  }
+  render();
+}
+const rgba = (k, a) => { const c = TH[k + "-rgb"]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+
+function sizeCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1, w = Math.round(cv.clientWidth * dpr);
+  if (cv.width !== w || cv.height !== w) { cv.width = w; cv.height = w; }
+  return dpr;
+}
+function view(cv, cx, cy, r) {
+  const W = cv.width, s = W / (2 * r);
+  return { s, X: x => W / 2 + (x - cx) * s, Y: y => W / 2 - (y - cy) * s };
+}
+function dot(g, x, y, r, fill, stroke, lw) {
+  g.beginPath(); g.arc(x, y, r, 0, 2 * Math.PI);
+  if (fill) { g.fillStyle = fill; g.fill(); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); }
+}
+function currentCandidate() {
+  const R = res, key = stepKey();
+  if (key === "coarse" && R.coarseBest) return { cr: R.coarseBest.zr, ci: R.coarseBest.zi, tx: 0, ty: 0 };
+  if (key === "annulus" || key === "halving" || key === "fine" || key === "result") return R.best || null;
+  return null;
+}
+
+function drawPoints() {
+  const cv = $("#cv-points"); if (!cv.clientWidth || !res) return;
+  const dpr = sizeCanvas(cv), g = cv.getContext("2d"), R = res, key = stepKey();
+  g.fillStyle = TH.surface; g.fillRect(0, 0, cv.width, cv.height);
+  const V = view(cv, R.view.cx, R.view.cy, R.view.r);
+  const k = key === "input" ? 0 : (key === "centre" ? R.anim : 1);
+  const lerp = (p, q) => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k];
+  const Ap = R.Araw.map((p, i) => lerp(p, R.A[i])), Bp = R.Braw.map((p, i) => lerp(p, R.B[i]));
+
+  if (k > 0) {   // axes through the common centroid
+    g.strokeStyle = rgba("muted", 0.35 * k); g.lineWidth = dpr;
+    g.beginPath(); g.moveTo(0, V.Y(0)); g.lineTo(cv.width, V.Y(0)); g.moveTo(V.X(0), 0); g.lineTo(V.X(0), cv.height); g.stroke();
+  }
+  if (key === "input" || key === "centre") {   // centroids
+    const mA = [R.muA[0] * (1 - k), R.muA[1] * (1 - k)], mB = [R.muB[0] * (1 - k), R.muB[1] * (1 - k)];
+    for (const [m, c] of [[mA, "pt-a"], [mB, "pt-b"]]) {
+      g.strokeStyle = TH[c]; g.lineWidth = 1.5 * dpr; const x = V.X(m[0]), y = V.Y(m[1]), s = 7 * dpr;
+      g.beginPath(); g.moveTo(x - s, y); g.lineTo(x + s, y); g.moveTo(x, y - s); g.lineTo(x, y + s); g.stroke();
+    }
+  }
+  if (R.far && (key === "anchors" || key === "sample")) {   // the far set J: ‖b‖ ≥ M_B/2
+    g.setLineDash([5 * dpr, 5 * dpr]); g.strokeStyle = rgba("muted", 0.7); g.lineWidth = dpr;
+    g.beginPath(); g.arc(V.X(0), V.Y(0), (R.MB / 2) * V.s, 0, 2 * Math.PI); g.stroke(); g.setLineDash([]);
+  }
+
+  const cand = currentCandidate();
+  if (cand) {
+    const plan = planCT(R, cand.cr, cand.ci, cand.tx, cand.ty);
+    const TB = R.B.map(b => [cand.cr * b[0] - cand.ci * b[1] + cand.tx, cand.cr * b[1] + cand.ci * b[0] + cand.ty]);
+    g.strokeStyle = rgba("muted", 0.75); g.lineWidth = 1.2 * dpr;
+    g.beginPath();
+    for (const [i, j] of plan.pairs) { g.moveTo(V.X(R.A[i][0]), V.Y(R.A[i][1])); g.lineTo(V.X(TB[j][0]), V.Y(TB[j][1])); }
+    g.stroke();
+    for (const p of Bp) dot(g, V.X(p[0]), V.Y(p[1]), 4 * dpr, null, rgba("pt-b", 0.3), 1.2 * dpr);
+    for (const p of TB) dot(g, V.X(p[0]), V.Y(p[1]), 3.6 * dpr, TH["pt-b"]);
+    $("#pt-caption").textContent = `EMD = ${fmt(plan.v)}`;
+  } else {
+    for (let j = 0; j < Bp.length; j++) {
+      const p = Bp[j];
+      const emph = (key === "anchors" && R.far && R.far[j]) || (key === "sample" && R.samples && R.samples.includes(j));
+      if (key === "sample" && R.samples && R.samples.includes(j)) dot(g, V.X(p[0]), V.Y(p[1]), 9 * dpr, null, TH.accent, 2 * dpr);
+      dot(g, V.X(p[0]), V.Y(p[1]), 4.5 * dpr, null, emph || !R.far ? TH["pt-b"] : rgba("pt-b", 0.45), 2 * dpr);
+    }
+    $("#pt-caption").textContent = key === "input" ? "raw coordinates" : "centred";
+  }
+  for (const p of Ap) dot(g, V.X(p[0]), V.Y(p[1]), 4.5 * dpr, TH["pt-a"]);
+}
+
+function planeView() {
+  const R = res, base = 1.45 * R.MA / R.MB;
+  if (planeZoom && R.best) {
+    const E = R.Pi || R.best.v;
+    return { cx: R.best.cr, cy: R.best.ci, r: Math.max(5 * E / R.MB, 0.06 * R.MA / R.MB) };
+  }
+  return { cx: 0, cy: 0, r: Math.max(base, cabs(R.cPl[0], R.cPl[1]) * 1.15) };
+}
+function heat(v, lo, hi) {
+  const L = x => Math.log(x + 1e-12);
+  let t = hi > lo ? (L(v) - L(lo)) / (L(hi) - L(lo)) : 0;
+  t = t >= 0 ? Math.min(1, t) : 0;
+  return rgba("accent", 0.95 - 0.8 * t);
+}
+function drawPlane() {
+  const cv = $("#cv-plane"); if (!cv.clientWidth || !res) return;
+  const dpr = sizeCanvas(cv), g = cv.getContext("2d"), R = res, key = stepKey(), ks = keys(), si = stepIdx;
+  g.fillStyle = TH.surface; g.fillRect(0, 0, cv.width, cv.height);
+  const pv = planeView(), V = view(cv, pv.cx, pv.cy, pv.r);
+  const W = cv.width;
+  // axes
+  g.strokeStyle = rgba("muted", 0.35); g.lineWidth = dpr;
+  g.beginPath(); g.moveTo(0, V.Y(0)); g.lineTo(W, V.Y(0)); g.moveTo(V.X(0), 0); g.lineTo(V.X(0), W); g.stroke();
+  g.fillStyle = TH.muted; g.font = `${11 * dpr}px "IBM Plex Mono", monospace`;
+  g.fillText("Re c", W - 40 * dpr, V.Y(0) - 6 * dpr); g.fillText("Im c", V.X(0) + 6 * dpr, 14 * dpr);
+
+  if (si >= 1) {   // |c| = M_A / M_B, where the scale lemma centres every good c
+    g.setLineDash([4 * dpr, 5 * dpr]); g.strokeStyle = rgba("muted", 0.6);
+    g.beginPath(); g.arc(V.X(0), V.Y(0), (R.MA / R.MB) * V.s, 0, 2 * Math.PI); g.stroke(); g.setLineDash([]);
+  }
+  // annulus band
+  let band = null;
+  if (key === "annulus") band = R.MA;
+  if (key === "halving" && R.levels && R.levels.length) band = R.levels[R.levels.length - 1].P;
+  if ((key === "coarse" || key === "fine") && R.Pi) band = R.Pi;
+  if (key === "result" && ctl.alg !== "c" && R.Pi) band = R.Pi;
+  if (band !== null) {
+    const r0 = Math.max(0, (R.MA - 2 * band) / R.MB), r1 = (R.MA + 2 * band) / R.MB;
+    g.fillStyle = rgba("accent", 0.1);
+    g.beginPath(); g.arc(V.X(0), V.Y(0), r1 * V.s, 0, 2 * Math.PI); g.arc(V.X(0), V.Y(0), r0 * V.s, 0, 2 * Math.PI, true); g.fill("evenodd");
+  }
+  // anchor centres
+  const showCentres = ctl.alg !== "c" && si >= ks.indexOf(ctl.alg === "b" ? "sample" : "anchors") && R.centres;
+  if (showCentres) {
+    if (R.coarse && R.coarse.length) {
+      const vs = R.coarse.map(e => e.v), lo = Math.min(...vs), hi = Math.max(...vs);
+      for (const e of R.centres) dot(g, V.X(e.zr), V.Y(e.zi), 2.6 * dpr, rgba("muted", 0.35));
+      for (const e of R.coarse) dot(g, V.X(e.zr), V.Y(e.zi), 3.2 * dpr, heat(e.v, lo, hi));
+    } else {
+      for (const e of R.centres) dot(g, V.X(e.zr), V.Y(e.zi), 2.8 * dpr, rgba("fg", 0.55));
+    }
+  }
+  // fine search
+  if (R.fine && (key === "fine")) {
+    for (const [x, y] of R.fine.visited) dot(g, V.X(x), V.Y(y), 5 * dpr, null, rgba("accent", 0.5), dpr);
+    if (R.fine.cur) {
+      const c = R.fine.cur;
+      g.strokeStyle = TH.accent; g.lineWidth = 1.5 * dpr;
+      g.beginPath(); g.arc(V.X(c.zr), V.Y(c.zi), R.fine.Rc * V.s, 0, 2 * Math.PI); g.stroke();
+      const vals = R.fine.pts.map(p => p[2]);
+      const lo = R.best.v, hi = Math.max(lo * 1.0001, ...vals);
+      for (const [x, y, v] of R.fine.pts) dot(g, V.X(x), V.Y(y), 1.8 * dpr, heat(v, lo, hi));
+    }
+  }
+  if (key === "halving" && R.levels && R.levels.length) {
+    const lev = R.levels[R.levels.length - 1];
+    if (lev.pts && lev.pts.length) {
+      const lo = R.best.v, hi = Math.max(lo * 1.0001, ...lev.pts.map(p => p[2]));
+      const r = Math.max(1, Math.min(2.2, 900 / lev.pts.length)) * dpr;
+      for (const [x, y, v] of lev.pts) dot(g, V.X(x), V.Y(y), r, heat(v, lo, hi));
+    }
+  }
+  // planted c (hidden from the algorithm)
+  if (si >= 1) dot(g, V.X(R.cPl[0]), V.Y(R.cPl[1]), 8 * dpr, null, TH.ok, 2 * dpr);
+  // best c so far
+  const cand = currentCandidate();
+  if (cand && !(key === "annulus")) {
+    const x = V.X(cand.cr), y = V.Y(cand.ci), s = 7 * dpr;
+    g.strokeStyle = TH.fg; g.lineWidth = 2.2 * dpr;
+    g.beginPath(); g.moveTo(x - s, y - s); g.lineTo(x + s, y + s); g.moveTo(x - s, y + s); g.lineTo(x + s, y - s); g.stroke();
+    g.strokeStyle = TH.accent; g.lineWidth = 1.2 * dpr; g.stroke();
+  }
+  if (key === "annulus") dot(g, V.X(0), V.Y(0), 5 * dpr, TH.accent);
+}
+
+// ─────────────────────────── explanation panel ───────────────────────────
+function theoryCalls() {
+  const e = ctl.eps, n = res.n, m = res.n;
+  if (ctl.alg === "a") { const Kc = Math.ceil(192 / e) + 2, Kt = Math.ceil(48 / e) + 2; return n * m + n * m * (2 * Kc + 1) ** 2 * (2 * Kt + 1) ** 2; }
+  if (ctl.alg === "b") { const Kc = Math.ceil(384 / e) + 2, Kt = Math.ceil(64 / e) + 2; return n * SAMPLES * (1 + (2 * Kc + 1) ** 2 * (2 * Kt + 1) ** 2); }
+  if (!res.ref) return NaN;
+  return 1 + 6.76e7 * (res.MA / res.ref) / e ** 4;
+}
+function stats(rows) { return `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`; }
+function panelHTML() {
+  const R = res, key = stepKey(), info = STEP_INFO[key], n = R.n, e = ctl.eps, alg = ctl.alg;
+  const head = `<span class="eyebrow">Step ${stepIdx + 1} of ${keys().length} · ${info.tag}</span><h3>${info.title}</h3>`;
+  let body = "", rows = [], note = "";
+  switch (key) {
+    case "input":
+      body = `<p>A (teal, filled) and B (magenta, hollow) each hold ${n} points of weight 1/${n}. A was made from B by a hidden similarity z ↦ c·z + t, then smeared by noise and shuffled, so nothing tells the algorithm which point belongs to which.</p>
+        <p>Points are complex numbers, so one complex parameter c carries both the rotation (arg c) and the scale (|c|). The goal is a map T̂ with EMD(A, T̂(B)) ≤ (1+ε)·OPT, where OPT is the best EMD over all similarities.</p>`;
+      rows = [["Points per set", n], ["Planted scale |c|", fmt(ctl.scale)], ["Planted rotation", `${ctl.twist}°`], ["Noise σ", fmt(R.sigma)]];
+      note = `With equal set sizes and uniform weights the exact EMD is a min-cost perfect matching divided by n. This page's oracle solves it exactly with the Hungarian method, so v = EMD.`;
+      break;
+    case "centre":
+      body = `<p>Translate both sets so their centroids sit at the origin. Translations belong to the group, so nothing is lost. After centring, any similarity of cost E has a short translation: ‖t‖ ≤ E (L1, the centroid bound).</p>
+        <p>Two numbers drive everything that follows: the first moments M_A = Σαᵢ‖aᵢ‖ and M_B = Σβⱼ‖bⱼ‖.</p>`;
+      rows = [["Centroid of A", `(${fmt(R.muA[0])}, ${fmt(R.muA[1])})`], ["Centroid of B", `(${fmt(R.muB[0])}, ${fmt(R.muB[1])})`], ["M_A", fmt(R.MA)], ["M_B", fmt(R.MB)], ["M_A / M_B", fmt(R.MA / R.MB)]];
+      break;
+    case "anchors":
+      body = `<p>Lemma L4: for any similarity of cost E, some pair (i, j) with ‖bⱼ‖ ≥ M_B/2 satisfies ‖c − aᵢ/bⱼ‖ ≤ 4E/M_B. So the ratios aᵢ/bⱼ are candidate centres for c.</p>
+        <p>The right panel is the c-plane. Each grey dot is one ratio aᵢ/bⱼ. The dashed circle has radius M_A/M_B, the scale that the first moments suggest. The green ring is the planted c, which the algorithm never sees. On the left, the dashed circle of radius M_B/2 marks the far points that L4 relies on.</p>`;
+      rows = [["Centres aᵢ/bⱼ", R.centres.length], ["Far points |J|", R.far.filter(Boolean).length], ["Oracle calls so far", R.evals]];
+      break;
+    case "sample":
+      body = `<p>Instead of all m points of B, draw k = ${SAMPLES} anchors (η = 1/16) from the far set J = {‖bⱼ‖ ≥ M_B/2}, each with probability ∝ βⱼ‖bⱼ‖. Ringed points on the left were drawn.</p>
+        <p>By Markov's inequality each draw is good with probability at least ½, and a good j has a receiver aᵢ with ‖c − aᵢ/bⱼ‖ ≤ 6E/M_B. All k draws fail with probability at most 2⁻ᵏ. Only the n·k centres aᵢ/bⱼ for sampled j go forward.</p>`;
+      rows = [["Draws", R.draws.map(j => "b" + (j + 1)).join(", ")], ["Distinct anchors", R.samples.length], ["Centres kept", R.centres.length], ["Failure bound", `2⁻${SAMPLES} = ${fmt(2 ** -SAMPLES)}`]];
+      break;
+    case "coarse": {
+      const lam = alg === "b" ? 6 : 4;
+      body = `<p>Evaluate every centre with t = 0. The pair from L4 costs at most E + ${lam}E + E = ${lam + 2}E by the Lipschitz bound L3, so Π̃ = min v(aᵢ/bⱼ, 0) is a ${lam + 2}(1+ε/3)-approximation of OPT.</p>
+        <p>Darker dots are cheaper. Π̃ sets the size of every window in the next step. The shaded band is the scale annulus |‖c‖·M_B − M_A| ≤ 2Π̃ (L2): any c that beats Π̃ lies inside it. The left panel shows the cheapest coarse alignment and its transport plan.</p>`;
+      rows = [["Centres evaluated", `${(R.coarse || []).length} / ${R.centres.length}`], ["Π̃ (best coarse value)", fmt(R.Pi)], ["Best centre", R.coarseBest ? cfmt(R.coarseBest.zr, R.coarseBest.zi) : "—"], ["Oracle calls so far", R.evals]];
+      break;
+    }
+    case "fine": {
+      if (!R.fine) { body = `<p>Laying out the grids…</p>`; break; }
+      const F = R.fine, lam = F.lam, C = (2 + lam) * (1 + e / 3);
+      const hcTheory = (e / 3) * R.Pi / (2 * C * R.MB), htTheory = (e / 3) * R.Pi / (2 * C);
+      body = `<p>Around each centre, a square grid for c covers the disk of radius ${lam}Π̃/M_B (orange circle), and a square grid for t covers ‖t‖ ≤ Π̃. Every pair (c, t) is one oracle call.</p>
+        <p>If Π̃ > OPT, the optimal c lies in one of these disks and the optimal t in the t-disk. The nearest grid point then loses at most (ε/3)·OPT by L3, and the oracle another factor (1+ε/3). Centres are visited cheapest first; the cross marks the best candidate so far.</p>`;
+      let now = "";
+      if (F.cur) {
+        const paused = !!(job && job.paused), k = paused ? F.done : F.done + 1, name = `a${F.cur.i + 1}/b${F.cur.j + 1}`;
+        const gained = R.best.v < F.bestBefore - 1e-12;
+        now = paused
+          ? `Centre ${k} of ${F.total} done (${name}, coarse value ${fmt(F.cur.v)}). ${gained ? `It lowered the best value from ${fmt(F.bestBefore)} to ${fmt(R.best.v)}.` : `No improvement: the best value stays ${fmt(R.best.v)}.`}`
+          : `Searching centre ${k} of ${F.total} (${name}, coarse value ${fmt(F.cur.v)}): ${F.pts.length} of ${(2 * F.K + 1) ** 2} grid points done.`;
+      } else if (F.done === F.total) now = `All ${F.total} centres searched.`;
+      if (now) body = `<p class="now">${now}</p>` + body;
+      rows = [["Centres searched", `${F.done} / ${F.total}`], ["Best value so far", fmt(R.best.v)], ["Best c", cfmt(R.best.cr, R.best.ci)], ["c-grid per centre", `${(2 * F.K + 1) ** 2} points`], ["t-grid", `${(2 * F.Kt + 1) ** 2} points`], ["Oracle calls so far", R.evals.toLocaleString("en-US")]];
+      note = `Demo resolution: c-spacing ${fmt(F.hc)} and t-spacing ${fmt(F.ht)}. The guarantee for ε = ${e} needs ${fmt(hcTheory)} and ${fmt(htTheory)}, a grid of about (2·${Math.ceil((lam === 6 ? 384 : 192) / e) + 2}+1)² points per centre. The windows are exact; only the spacing is coarser.`;
+      break;
+    }
+    case "annulus":
+      body = `<p>Lemma L2: any similarity of cost E has |‖c‖·M_B − M_A| ≤ 2E. So a good c lies on an annulus of radius M_A/M_B and width 4E/M_B. No anchor centres are needed.</p>
+        <p>The search starts from the trivial candidate (c, t) = (0, 0), which maps all of B to the origin and costs at most M_A, and from the cost guess P₀ = M_A ≥ OPT. Its annulus, shaded, is still a full disk.</p>`;
+      rows = [["v(0, 0)", fmt(R.best.v)], ["M_A (first guess P₀)", fmt(R.MA)], ["ρ = M_A/OPT", "found at the end"]];
+      break;
+    case "halving": {
+      const L = R.levels || [];
+      body = `<p>At level ℓ, set P = M_A/2^ℓ. Cover the annulus |‖c‖·M_B − M_A| ≤ 2P with a polar grid whose spacing shrinks with P, and t with a grid of radius P. Keep the best value V over everything seen. Stop as soon as V > P.</p>
+        <p>When the rule fires, some level already visited had E ≤ P ≤ 2E, and that level holds a (1+ε)-good candidate. Each level has twice as many grid points as the one before, so the total is dominated by the last level: O(ρ/ε⁴) calls with ρ = M_A/OPT, independent of n and m.</p>`;
+      const lev = L[L.length - 1];
+      if (lev) {
+        const now = lev.V === null
+          ? `Level ℓ = ${lev.l}, P = ${fmt(lev.P)}: ${(lev.pts ? lev.pts.length : 0).toLocaleString("en-US")} of ${lev.total.toLocaleString("en-US")} c-points evaluated, 9 t-values each.`
+          : `Level ℓ = ${lev.l} done: V = ${fmt(lev.V)} ${lev.stop ? ">" : "≤"} P = ${fmt(lev.P)}, so ${lev.stop ? "the rule fires and the search stops." : lev.capped ? "the demo budget is used up." : "halve P and continue."}`;
+        body = `<p class="now">${now}</p>` + body;
+      }
+      const rowsH = L.map(lv => `<tr><td>${lv.l}</td><td>${fmt(lv.P)}</td><td>${lv.count.toLocaleString("en-US")}</td><td>${lv.V === null ? "…" : fmt(lv.V)}</td><td class="${lv.stop ? "stop" : ""}">${lv.V === null ? "running" : lv.stop ? "V > P: stop" : lv.capped ? "budget" : "continue"}</td></tr>`).join("");
+      body += `<div class="tablewrap"><table class="levels"><thead><tr><th>ℓ</th><th>P</th><th>calls</th><th>V</th><th>rule</th></tr></thead><tbody>${rowsH}</tbody></table></div>`;
+      rows = [["Best c", cfmt(R.best.cr, R.best.ci)], ["Oracle calls so far", R.evals.toLocaleString("en-US")]];
+      note = `Demo resolution: radial spacing P/(${fmt(ctl.K / 2)}·M_B) and a 3×3 t-grid. The guarantee uses spacing εP/(12·M_B).`;
+      break;
+    }
+    case "result": {
+      const ratio = R.ref ? R.best.v / R.ref : NaN;
+      body = `<p>Return the cheapest candidate seen. At the theoretical resolution the output is guaranteed to be within a factor (1+ε) of OPT. To check this demo's coarser run, the reference value comes from a local search started at the output and at the planted map; it is an upper bound on OPT.</p>`;
+      rows = [["Output value V", fmt(R.best.v)], ["Output c", cfmt(R.best.cr, R.best.ci)], ["Output t", `(${fmt(R.best.tx)}, ${fmt(R.best.ty)})`], ["Reference value", R.ref ? fmt(R.ref) : "computing…"], ["V / reference", R.ref ? fmt(ratio, 4) : "…"], ["Planted c", cfmt(R.cPl[0], R.cPl[1])], ["Oracle calls (this demo)", R.evals.toLocaleString("en-US")], [`Oracle calls (theory, ε = ${e})`, big(theoryCalls())]];
+      if (alg === "c" && R.ref) rows.splice(5, 0, ["ρ = M_A / reference", fmt(R.MA / R.ref)]);
+      note = alg === "a" ? `Theory count for (a): nm + nm·(2K_c+1)²(2K_t+1)² with K_c ≤ 192/ε + 2 and K_t ≤ 48/ε + 2, as verified in Lean (card_cand, K_bounds).`
+           : alg === "b" ? `Theory count for (b): n·k·(1 + (2K_c′+1)²(2K_t′+1)²) with K_c′ ≤ 384/ε + 2 and K_t′ ≤ 64/ε + 2 (card_sampled, Kg6_bounds). Correct with probability at least 1 − 2⁻ᵏ.`
+           : `Theory count for (c): at most 1 + 6.76·10⁷·ρ/ε⁴ (annulus_total). Run it alongside (a) or (b) to get min(nm, ρ)/ε⁴.`;
+      break;
+    }
+  }
+  return `${head}${body}${stats(rows)}${note ? `<p class="note">${note}</p>` : ""}`;
+}
+function progressFrac() {
+  const R = res, key = stepKey();
+  if (!job) return 1;
+  if (key === "centre") return R.anim;
+  if (key === "coarse") return R.coarse ? R.coarse.length / R.centres.length : 0;
+  if (key === "fine") {
+    if (!R.fine) return 0;
+    const inUnit = R.fine.cur && !job.paused ? R.fine.pts.length / (2 * R.fine.K + 1) ** 2 : 0;
+    return Math.min(1, (R.fine.done + inUnit) / R.fine.total);
+  }
+  if (key === "halving") {   // progress through the current level
+    const L = R.levels || [], lev = L[L.length - 1];
+    return lev ? (lev.V !== null ? 1 : (lev.pts ? lev.pts.length : 0) / lev.total) : 0;
+  }
+  return 0.5;
+}
+
+// ─────────────────────────── render & UI ───────────────────────────
+function renderRail() {
+  const ks = keys();
+  $("#rail").innerHTML = ks.map((k, i) => {
+    const cls = i === stepIdx ? "cur" : (snapshots[i] ? "done" : "");
+    const can = (snapshots[i] || i === stepIdx || (snapshots[i - 1] && !job)) ? "" : "disabled";
+    return `<li class="${cls}"><button type="button" data-step="${i}" ${can} ${i === stepIdx ? 'aria-current="step"' : ""}><span class="no">${i + 1}</span><span>${STEP_INFO[k].title}</span><span class="tag">${STEP_INFO[k].tag}</span></button></li>`;
+  }).join("");
+}
+function updateButtons() {
+  const paused = !!(job && job.paused), last = stepIdx >= keys().length - 1, nx = $("#btn-next");
+  $("#btn-prev").disabled = stepIdx === 0 || (!!job && !paused);
+  if (paused) { nx.disabled = false; nx.textContent = job.key === "halving" ? "Next level →" : "Next centre →"; }
+  else if (job) { nx.disabled = true; nx.textContent = "Running…"; }
+  else { nx.disabled = last; nx.textContent = last ? "Done" : "Next step →"; }
+  const fin = $("#btn-finish");
+  fin.hidden = !job;
+  fin.disabled = !!(job && job.rush);
+}
+let lastPanel = 0;
+function render() {
+  if (!res || !TH.surface) return;
+  drawPoints(); drawPlane();
+  const now = performance.now();
+  if (!job || now - lastPanel > 120) {
+    try { $("#panel").innerHTML = panelHTML(); } catch (err) { console.error(err); }   // a panel glitch must never stall the run
+    lastPanel = now; renderRail();
+  }
+  $("#prog").style.width = (progressFrac() * 100).toFixed(1) + "%";
+  updateButtons();
+}
+
+$("#rail").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-step]"); if (!b || b.disabled || (job && !job.paused)) return;
+  stopPlay(); enterStep(Number(b.dataset.step));
+});
+$("#btn-next").addEventListener("click", () => {
+  if (job && job.paused) resume();
+  else if (!job && stepIdx < keys().length - 1) enterStep(stepIdx + 1);
+});
+$("#btn-prev").addEventListener("click", () => { if ((!job || job.paused) && stepIdx > 0) { stopPlay(); enterStep(stepIdx - 1); } });
+$("#btn-finish").addEventListener("click", () => rushStep());
+$("#btn-play").addEventListener("click", () => {
+  if (playing) { stopPlay(); return; }
+  playing = true; $("#btn-play").textContent = "Pause";
+  if (job && job.paused) resume();
+  else if (!job) { if (stepIdx < keys().length - 1) enterStep(stepIdx + 1); else { enterStep(0); } }
+});
+$("#btn-fit").addEventListener("click", () => { planeZoom = false; render(); });
+$("#btn-zoom").addEventListener("click", () => { planeZoom = true; render(); });
+document.addEventListener("keydown", ev => {
+  if (ev.target.closest("input, select")) return;
+  if (ev.key === "ArrowRight") $("#btn-next").click();
+  if (ev.key === "ArrowLeft") $("#btn-prev").click();
+});
+
+const bind = (id, key, outFmt, reset = true) => {
+  const el = $(id), out = $(id.replace("in-", "out-"));
+  el.addEventListener("input", () => {
+    ctl[key] = Number(el.value);
+    if (out) out.textContent = outFmt(ctl[key]);
+    if (reset) resetAll(); else render();
+  });
+};
+bind("#in-n", "n", v => v);
+bind("#in-noise", "noise", v => v.toFixed(2));
+bind("#in-twist", "twist", v => v + "°");
+bind("#in-scale", "scale", v => v.toFixed(1));
+bind("#in-eps", "eps", v => v.toFixed(2), false);
+bind("#in-k", "K", v => v);
+$("#in-seed").addEventListener("change", () => { const s = parseInt($("#in-seed").value, 10); if (s > 0) { ctl.seed = s; resetAll(); } });
+$("#btn-new").addEventListener("click", () => { ctl.seed = ctl.seed + 1; $("#in-seed").value = ctl.seed; resetAll(); });
+$("#in-speed").addEventListener("change", () => {
+  ctl.speed = $("#in-speed").value;
+  if (job && job.paused && ctl.speed !== "step") resume();
+  render();
+});
+document.querySelectorAll('input[name="alg"]').forEach(r => r.addEventListener("change", () => { ctl.alg = r.value; resetAll(); }));
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+new ResizeObserver(() => render()).observe($("#cv-points"));
+
+base = makeInstance();
+readTheme();
+resetAll();
+</script>
+</body>
+</html>
